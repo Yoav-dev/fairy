@@ -38,12 +38,14 @@ class BasicTests {
 				}
 			}});
 			Directory root = localFileSystem.getDirectory("/");
-			localFileSystem.getItemsMonitor().markItemForAction(root
+			Directory y = root
 					.getDirectory("run")
 					.getDirectory("media")
 					.getDirectory("yoav")
 					.getDirectory("3C9550D109262BB2")
-					.getDirectory("y"));
+					.getDirectory("y");
+			localFileSystem.getItemsMonitor().markItemForAction(y.getDirectory("New1"));
+			localFileSystem.getItemsMonitor().markItemForAction(y.getDirectory("New2"));
 			localFileSystem.getItemsMonitor().startMonitor();
 			Thread.sleep(Long.MAX_VALUE);
 		} catch (IOException e) {
