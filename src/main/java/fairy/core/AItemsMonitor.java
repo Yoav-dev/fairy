@@ -6,6 +6,7 @@ import java.nio.file.StandardWatchEventKinds;
 import java.nio.file.WatchEvent;
 import java.nio.file.WatchKey;
 import java.nio.file.WatchService;
+import java.time.Duration;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.Collection;
@@ -14,6 +15,7 @@ import java.util.List;
 import java.util.Map;
 import java.util.TreeMap;
 import java.util.TreeSet;
+import java.util.concurrent.TimeUnit;
 
 // Monitors items (Files or directories) for changes as modifications, adding/deleting sub-items to/from directory, etc
 public abstract class AItemsMonitor {
@@ -67,6 +69,66 @@ public abstract class AItemsMonitor {
 		m_ItemActioners.addAll(Arrays.asList(i_ItemActioners));
 	}
 	
+	private void traverseEvents(Duration i_DurationBeforeKey, TreeMap<ItemUniqueProperties, ItemProperties> o_AffectedPoperties, TreeSet<ItemUniqueProperties> o_ItemsToDelete) throws Throwable {
+		WatchKey watchKey;
+		
+		if (i_DurationBeforeKey == null || i_DurationBeforeKey.isZero()) {
+			watchKey = m_WatchService.take();
+		} else {
+			watchKey = m_WatchService.poll(i_DurationBeforeKey.toMillis(), TimeUnit.MILLISECONDS);
+		}
+		
+		if (watchKey == null) {
+			return;
+		}
+		
+		Directory parent = m_WatchKeys2Paths.get(watchKey);
+		List<WatchEvent<?>> events = watchKey.pollEvents();
+		watchKey.reset();
+		
+		for (WatchEvent<?> event : events) {						
+				// Get name of item under directory being watched
+				String name = extractName(event.context());
+
+				// Item created
+				if (event.kind().equals(StandardWatchEventKinds.ENTRY_CREATE)) {
+					AItem item = parent.readItem(name);
+					EPropertiesAffectType affectType = EPropertiesAffectType.eCreate;
+					
+					if (o_ItemsToDelete.contains(item.getUniqueProperties())) {										
+						affectType = EPropertiesAffectType.eRename;
+					}
+					
+					ItemProperties itemProperties = new ItemProperties(name, 
+							parent,
+							affectType,
+							affectType == EPropertiesAffectType.eCreate ? item.getCreationTime() : System.currentTimeMillis());
+					
+					o_AffectedPoperties.put(item.getUniqueProperties(), itemProperties);
+					
+					continue;
+				}
+
+				if (event.kind().equals(StandardWatchEventKinds.ENTRY_DELETE)) {
+					AItem item = parent.getItem(name);
+					o_ItemsToDelete.add(item.getUniqueProperties());
+
+					continue;
+				}
+
+				if (event.kind().equals(StandardWatchEventKinds.ENTRY_MODIFY)) {
+					File modifiedFile = (File)parent.getItem(name);
+					ItemProperties itemProperties = new ItemProperties(modifiedFile.getName(), 
+																														modifiedFile.getParent(),
+																														EPropertiesAffectType.eModify,
+																														System.currentTimeMillis());
+					o_AffectedPoperties.put(modifiedFile.getUniqueProperties(), itemProperties);
+					
+					continue;
+				}
+			}
+	}
+	
 	public void startMonitor() {		
 		Thread monitorThread = new Thread(new Runnable() {
 			@Override
@@ -77,91 +139,32 @@ public abstract class AItemsMonitor {
 				
 				while (true) {
 					try {
-						WatchKey watchKey = null;
-						watchKey = m_WatchService.take();
-						List<WatchEvent<?>> events = watchKey.pollEvents();
-						watchKey.reset();
+						traverseEvents(null, affectedPoperties, itemsToDelete);
+						traverseEvents(Duration.ofSeconds(6), affectedPoperties, itemsToDelete);
 						
-						// Directory being watched
-						Directory parent = m_WatchKeys2Paths.get(watchKey);
 						long timestamp = System.currentTimeMillis();
-						AItem item = null;
-						
-						for (WatchEvent<?> event : events) {						
-								// Get name of item under directory being watched
-								String name = extractName(event.context());
-								
-								
-								// Item created
-								if (event.kind().equals(StandardWatchEventKinds.ENTRY_CREATE)) {
-//									// Sometimes, item that already exists and it is identified as modified
-//									if (parent.containsItem(name)) {
-//										File modifiedFile = (File)parent.getItem(name);
-//										ItemProperties itemProperties = new ItemProperties(modifiedFile.getName(), 
-//																																			modifiedFile.getParent(),
-//																																			EPropertiesAffectType.eModify,
-//																																			System.currentTimeMillis());
-//										affectedPoperties.put(modifiedFile.getUniqueProperties(), itemProperties);
-//										
-//										continue;
-//									}
-									
-									item = parent.readItem(name);
-									EPropertiesAffectType affectType = EPropertiesAffectType.eCreate;
-									
-									if (itemsToDelete.contains(item.getUniqueProperties())) {										
-										affectType = EPropertiesAffectType.eRename;
-									}
-									
-									ItemProperties itemProperties = new ItemProperties(name, 
-											parent,
-											affectType,
-											affectType == EPropertiesAffectType.eCreate ? item.getCreationTime() : System.currentTimeMillis());
-									
-									affectedPoperties.put(item.getUniqueProperties(), itemProperties);
-									
-									continue;
-								}
-	
-								if (event.kind().equals(StandardWatchEventKinds.ENTRY_DELETE)) {
-									item = parent.getItem(name);
-									itemsToDelete.add(item.getUniqueProperties());
-			
-									continue;
-								}
-	
-								if (event.kind().equals(StandardWatchEventKinds.ENTRY_MODIFY)) {
-									item = parent.getItem(name);
-									File modifiedFile = (File)parent.getItem(name);
-									ItemProperties itemProperties = new ItemProperties(modifiedFile.getName(), 
-																																		modifiedFile.getParent(),
-																																		EPropertiesAffectType.eModify,
-																																		System.currentTimeMillis());
-									affectedPoperties.put(modifiedFile.getUniqueProperties(), itemProperties);
-									
-									continue;
-								}
-							}
-
 						
 						for (ItemUniqueProperties itemUniqueProperties : affectedPoperties.keySet()) {
 							ItemProperties itemsProperties = affectedPoperties.get(itemUniqueProperties);
+							AItem item = m_FileSystem.getItem(itemUniqueProperties);
+							Directory parent = item.getParent();
 							
 							if (m_ItemsMarkedForAction.containsKey(parent.getUniqueProperties())) {
-							if (itemsProperties.getAffectType() == EPropertiesAffectType.eCreate) {
-									for (AItemActioner itemActioner : m_ItemActioners) {
-										itemActioner.created(itemsProperties.getPath(), itemsProperties.getTimestamp());
-									}
-							} else if (itemsProperties.getAffectType() == EPropertiesAffectType.eModify) {
-									for (AItemActioner itemActioner : m_ItemActioners) {
-										itemActioner.modified(itemsProperties.getPath(), itemsProperties.getSize(), timestamp);
-									}
-							} else if (itemsProperties.getAffectType() == EPropertiesAffectType.eRename) {
-									for (AItemActioner itemActioner : m_ItemActioners) {
-										itemActioner.renamed(item.getPath(), itemsProperties.getPath(), timestamp);
-									}
+								if (itemsProperties.getAffectType() == EPropertiesAffectType.eCreate) {
+										for (AItemActioner itemActioner : m_ItemActioners) {
+											itemActioner.created(itemsProperties.getPath(), itemsProperties.getTimestamp());
+										}
+								} else if (itemsProperties.getAffectType() == EPropertiesAffectType.eModify) {
+										for (AItemActioner itemActioner : m_ItemActioners) {
+											itemActioner.modified(itemsProperties.getPath(), itemsProperties.getSize(), timestamp);
+										}
+								} else if (itemsProperties.getAffectType() == EPropertiesAffectType.eRename) {
+										for (AItemActioner itemActioner : m_ItemActioners) {
+											itemActioner.renamed(item.getPath(), itemsProperties.getPath(), timestamp);
+										}
 								}
 							}
+							
 							item.addToHistory(itemsProperties);
 							itemsToDelete.remove(itemUniqueProperties);
 						}
@@ -170,12 +173,14 @@ public abstract class AItemsMonitor {
 						
 						for (ItemUniqueProperties itemUniqueProperties : itemsToDelete) {
 							AItem itemToDelete = m_FileSystem.getItem(itemUniqueProperties);
+							Directory parent = itemToDelete.getParent();
 							
 							if (m_ItemsMarkedForAction.containsKey(parent.getUniqueProperties())) {
-							for (AItemActioner itemActioner : m_ItemActioners) {
-								itemActioner.deleted(itemToDelete.getPath(), timestamp);
+								for (AItemActioner itemActioner : m_ItemActioners) {
+									itemActioner.deleted(itemToDelete.getPath(), timestamp);
+								}
 							}
-							}
+							
 							itemToDelete.delete(timestamp);
 						}
 						
