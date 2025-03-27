@@ -149,7 +149,7 @@ public abstract class AItemsMonitor {
 							AItem item = m_FileSystem.getItem(itemUniqueProperties);
 							Directory parent = item.getParent();
 							
-							if (m_ItemsMarkedForAction.containsKey(parent.getUniqueProperties())) {
+							if (m_ItemsMarkedForAction.containsKey(parent.getUniqueProperties()) || m_ItemsMarkedForAction.containsKey(itemsProperties.getParent().getUniqueProperties())) {
 								if (itemsProperties.getAffectType() == EPropertiesAffectType.eCreate) {
 										for (AItemActioner itemActioner : m_ItemActioners) {
 											itemActioner.created(itemsProperties.getPath(), itemsProperties.getTimestamp());
