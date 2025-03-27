@@ -69,19 +69,8 @@ public abstract class AItemsMonitor {
 		m_ItemActioners.addAll(Arrays.asList(i_ItemActioners));
 	}
 	
-	private void traverseEvents(Duration i_DurationBeforeKey, TreeMap<ItemUniqueProperties, ItemProperties> o_AffectedPoperties, TreeSet<ItemUniqueProperties> o_ItemsToDelete) throws Throwable {
-		WatchKey watchKey;
-		
-		if (i_DurationBeforeKey == null || i_DurationBeforeKey.isZero()) {
-			watchKey = m_WatchService.take();
-		} else {
-			watchKey = m_WatchService.poll(i_DurationBeforeKey.toMillis(), TimeUnit.MILLISECONDS);
-		}
-		
-		if (watchKey == null) {
-			return;
-		}
-		
+	private void traverseEvents(TreeMap<ItemUniqueProperties, ItemProperties> o_AffectedPoperties, TreeSet<ItemUniqueProperties> o_ItemsToDelete) throws Throwable {
+		WatchKey watchKey = m_WatchService.take();
 		Directory parent = m_WatchKeys2Paths.get(watchKey);
 		List<WatchEvent<?>> events = watchKey.pollEvents();
 		watchKey.reset();
@@ -139,17 +128,16 @@ public abstract class AItemsMonitor {
 				
 				while (true) {
 					try {
-						traverseEvents(null, affectedPoperties, itemsToDelete);
-						traverseEvents(Duration.ofSeconds(6), affectedPoperties, itemsToDelete);
+						traverseEvents(affectedPoperties, itemsToDelete);
 						
 						long timestamp = System.currentTimeMillis();
 						
 						for (ItemUniqueProperties itemUniqueProperties : affectedPoperties.keySet()) {
 							ItemProperties itemsProperties = affectedPoperties.get(itemUniqueProperties);
 							AItem item = m_FileSystem.getItem(itemUniqueProperties);
-							Directory parent = item.getParent();
+							Directory parent = itemsProperties.getParent();
 							
-							if (m_ItemsMarkedForAction.containsKey(parent.getUniqueProperties()) || m_ItemsMarkedForAction.containsKey(itemsProperties.getParent().getUniqueProperties())) {
+							if (m_ItemsMarkedForAction.containsKey(parent.getUniqueProperties())) {
 								if (itemsProperties.getAffectType() == EPropertiesAffectType.eCreate) {
 										for (AItemActioner itemActioner : m_ItemActioners) {
 											itemActioner.created(itemsProperties.getPath(), itemsProperties.getTimestamp());
