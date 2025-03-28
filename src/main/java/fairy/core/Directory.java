@@ -70,7 +70,7 @@ public class Directory extends AItem {
 			
 			m_FileSystem.addItem(item);
 		} else {
-			unreadItem(i_Name);
+			unreadItem(item.getName());
 		}
 
 		m_Children.put(i_Name, item);

@@ -6,7 +6,6 @@ import java.nio.file.StandardWatchEventKinds;
 import java.nio.file.WatchEvent;
 import java.nio.file.WatchKey;
 import java.nio.file.WatchService;
-import java.time.Duration;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.Collection;
@@ -15,7 +14,6 @@ import java.util.List;
 import java.util.Map;
 import java.util.TreeMap;
 import java.util.TreeSet;
-import java.util.concurrent.TimeUnit;
 
 // Monitors items (Files or directories) for changes as modifications, adding/deleting sub-items to/from directory, etc
 public abstract class AItemsMonitor {
@@ -91,7 +89,7 @@ public abstract class AItemsMonitor {
 					ItemProperties itemProperties = new ItemProperties(name, 
 							parent,
 							affectType,
-							affectType == EPropertiesAffectType.eCreate ? item.getCreationTime() : System.currentTimeMillis());
+							item.newlyCreated() ? item.getCreationTime() : System.currentTimeMillis());
 					
 					o_AffectedPoperties.put(item.getUniqueProperties(), itemProperties);
 					

@@ -27,6 +27,9 @@ public abstract class AItem {
 		isDirectory = i_IsDirectory;
 	}
 
+	boolean newlyCreated() {
+		return m_History.isEmpty();
+	}
 	public String getName() {
 		return m_History.get(m_History.lastKey()).getName();
 	}
