@@ -135,4 +135,14 @@ public class LocalFileSystem extends AFileSystem {
 		
 		return childrenIds;
 	}
+
+	@Override
+	protected void addFile(Path i_ParentPath, String i_Name) throws IOException {
+		i_ParentPath.resolve(i_Name).toFile().createNewFile();
+	}
+
+	@Override
+	protected void addDirectory(Path i_ParentPath, String i_Name) {
+		i_ParentPath.resolve(i_Name).toFile().mkdir();
+	}
 }

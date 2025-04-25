@@ -21,13 +21,10 @@ public class File extends AItem {
 		return m_FileSystem.getFileOutputStream(this.getPath());
 	}
 
-	void updateContent(long i_NewSize) throws Throwable {
+	void updateContent() throws Throwable {
 		long timeStamp = System.currentTimeMillis();
 		long oldSize = getSize();
-//		m_SizesHistory.put(timeStamp, i_NewSize);
-//		m_ContentsHistory.put(timeStamp, i_NewContent);
-		
-		long sizesDiff = oldSize - i_NewSize;
+		long sizesDiff = oldSize - readSize();
 		Directory parent = getParent();
 		
 		while (parent != null) {

@@ -69,4 +69,11 @@ public abstract class AItem {
 	ItemUniqueProperties getUniqueProperties() {
 		return uniqueProperties;
 	}
+	
+	void updateSize(long i_NewSize, long i_TimeStamp) {
+		addToHistory(new ItemProperties(this.getName(), 
+				this.getParent(),
+				EPropertiesAffectType.eModify,
+				i_TimeStamp));
+	}
 }

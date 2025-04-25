@@ -2,6 +2,7 @@ package fairy.core;
 
 import java.io.IOException;
 import java.nio.file.AccessDeniedException;
+import java.nio.file.Path;
 import java.nio.file.StandardWatchEventKinds;
 import java.nio.file.WatchEvent;
 import java.nio.file.WatchKey;
@@ -46,20 +47,28 @@ public abstract class AItemsMonitor {
 	
 	//*
 	// Register item so it is watched
-	protected abstract WatchKey registerItem(AItem i_MonitoredItem, WatchService i_WatchService) throws IOException;
+	protected abstract WatchKey registerDirectory(Path i_Path, WatchService i_WatchService) throws IOException;
 
-	void registerItem(Directory i_MonitoredItem) throws IOException {
+	void registerDirectory(Directory i_Directory, Path i_Path) throws IOException {
 		try {
-			if (i_MonitoredItem instanceof Directory) {
-				WatchKey watchKey = registerItem(i_MonitoredItem, m_WatchService);
-				m_WatchKeys2Paths.put(watchKey, i_MonitoredItem);
-			}
+				WatchKey watchKey = registerDirectory(i_Path, m_WatchService);
+				m_WatchKeys2Paths.put(watchKey, i_Directory);
 		} catch (AccessDeniedException e) {
 		}
 	}
 	
 	public void markItemForAction(AItem i_Item) throws IOException {
 		m_ItemsMarkedForAction.putIfAbsent(i_Item.getUniqueProperties(), i_Item);
+		
+		if (i_Item.isDirectory) {
+			Collection<AItem> children = ((Directory)i_Item).getChildren();
+			
+			if (children != null && !children.isEmpty()) {
+				for (AItem child : children) {
+					markItemForAction(child);
+				}
+			}
+		}
 	}
 	//*
 	
@@ -110,7 +119,7 @@ public abstract class AItemsMonitor {
 																														EPropertiesAffectType.eModify,
 																														System.currentTimeMillis());
 					o_AffectedPoperties.put(modifiedFile.getUniqueProperties(), itemProperties);
-					
+					modifiedFile.updateContent();
 					continue;
 				}
 			}
@@ -133,25 +142,27 @@ public abstract class AItemsMonitor {
 						for (ItemUniqueProperties itemUniqueProperties : affectedPoperties.keySet()) {
 							ItemProperties itemsProperties = affectedPoperties.get(itemUniqueProperties);
 							AItem item = m_FileSystem.getItem(itemUniqueProperties);
+							item.addToHistory(itemsProperties);
 							Directory parent = itemsProperties.getParent();
 							
 							if (m_ItemsMarkedForAction.containsKey(parent.getUniqueProperties())) {
 								if (itemsProperties.getAffectType() == EPropertiesAffectType.eCreate) {
+										m_ItemsMarkedForAction.put(item.getUniqueProperties(), item);
+										
 										for (AItemActioner itemActioner : m_ItemActioners) {
-											itemActioner.created(itemsProperties.getPath(), itemsProperties.getTimestamp());
+											itemActioner.created(item, itemsProperties.getTimestamp());
 										}
 								} else if (itemsProperties.getAffectType() == EPropertiesAffectType.eModify) {
 										for (AItemActioner itemActioner : m_ItemActioners) {
-											itemActioner.modified(itemsProperties.getPath(), itemsProperties.getSize(), timestamp);
+											itemActioner.modified(item, itemsProperties.getSize(), timestamp);
 										}
 								} else if (itemsProperties.getAffectType() == EPropertiesAffectType.eRename) {
 										for (AItemActioner itemActioner : m_ItemActioners) {
-											itemActioner.renamed(item.getPath(), itemsProperties.getPath(), timestamp);
+											itemActioner.renamed(item, item.getPath(), itemsProperties.getPath(), timestamp);
 										}
 								}
 							}
 							
-							item.addToHistory(itemsProperties);
 							itemsToDelete.remove(itemUniqueProperties);
 						}
 						
@@ -163,7 +174,7 @@ public abstract class AItemsMonitor {
 							
 							if (m_ItemsMarkedForAction.containsKey(parent.getUniqueProperties())) {
 								for (AItemActioner itemActioner : m_ItemActioners) {
-									itemActioner.deleted(itemToDelete.getPath(), timestamp);
+									itemActioner.deleted(itemToDelete, timestamp);
 								}
 							}
 							

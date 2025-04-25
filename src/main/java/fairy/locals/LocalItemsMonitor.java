@@ -7,7 +7,6 @@ import java.nio.file.StandardWatchEventKinds;
 import java.nio.file.WatchKey;
 import java.nio.file.WatchService;
 
-import fairy.core.AItem;
 import fairy.core.AItemsMonitor;
 
 public class LocalItemsMonitor extends AItemsMonitor {	
@@ -27,7 +26,7 @@ public class LocalItemsMonitor extends AItemsMonitor {
 	}
 	
 	@Override
-	protected WatchKey registerItem(AItem i_MonitoredItem, WatchService i_WatchService) throws IOException {
-		return i_MonitoredItem.getPath().register(i_WatchService, StandardWatchEventKinds.ENTRY_CREATE, StandardWatchEventKinds.ENTRY_DELETE, StandardWatchEventKinds.ENTRY_MODIFY);	
+	protected WatchKey registerDirectory(Path i_Path, WatchService i_WatchService) throws IOException {
+		return i_Path.register(i_WatchService, StandardWatchEventKinds.ENTRY_CREATE, StandardWatchEventKinds.ENTRY_DELETE, StandardWatchEventKinds.ENTRY_MODIFY);	
 	}
 }

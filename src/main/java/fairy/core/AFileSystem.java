@@ -1,5 +1,6 @@
 package fairy.core;
 
+import java.io.IOException;
 import java.io.InputStream;
 import java.io.OutputStream;
 import java.nio.file.Path;
@@ -7,6 +8,7 @@ import java.util.Collection;
 import java.util.HashMap;
 import java.util.Map;
 import java.util.TreeMap;
+
 
 /**
  * Represents a file system, such as local file system on hard drive, remote file system on cloud, etc
@@ -36,10 +38,11 @@ public abstract class AFileSystem {
 
 		for (String rootName : rootsNames) {
 			Directory rootDirectory = new Directory(rootName, null, this);
-//			rootDirectory.addPathToHistory();
 			m_RootDirectories.put(rootName, rootDirectory);
 		}
 		//*
+		
+		m_ItemsMonitor.startMonitor();
 	}
 
 	public AItemsMonitor getItemsMonitor() {
@@ -104,4 +107,6 @@ public abstract class AFileSystem {
 	protected abstract boolean isDirectory(Path i_Path) throws Throwable;
 	protected abstract boolean isLink(Path i_Path) throws Throwable;
 	protected abstract long getCreationTime(Path i_Path);
+	protected abstract void addFile(Path i_ParentPath, String i_Name) throws IOException;
+	protected abstract void addDirectory(Path i_ParentPath, String i_Name);
 }

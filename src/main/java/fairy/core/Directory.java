@@ -1,12 +1,14 @@
 package fairy.core;
 
 import java.nio.file.Path;
+import java.time.Duration;
 import java.util.Collection;
 import java.util.HashMap;
 import java.util.Map;
+import java.util.concurrent.ConcurrentHashMap;
 
-public class Directory extends AItem {
-	private Map<String, AItem> m_Children = new HashMap<String, AItem>();
+public class Directory extends AItem {	
+	private ConcurrentHashMap<String, AItem> m_Children = new ConcurrentHashMap<String, AItem>();
 	
 	static Path getSubItemPath(Directory i_Parent, String i_Name) {
 		return i_Parent == null ? Path.of(i_Name) : i_Parent.getSubItemPath(i_Name);
@@ -63,7 +65,6 @@ public class Directory extends AItem {
 		if (item == null) {
 			if (isDirectory) {
 				item = new Directory(i_Name, this, m_FileSystem);
-				m_FileSystem.getItemsMonitor().registerItem((Directory)item);
 			} else {
 				item = new File(i_Name, this, m_FileSystem);
 			}
@@ -73,6 +74,7 @@ public class Directory extends AItem {
 			unreadItem(item.getName());
 		}
 
+		m_FileSystem.getItemsMonitor().registerDirectory((Directory)item, itemPath);
 		m_Children.put(i_Name, item);
 		
 		return item;
@@ -85,8 +87,28 @@ public class Directory extends AItem {
 		return item;
 	}
 	
+	public File addFile(String i_Name) throws Throwable {
+		m_FileSystem.addFile(this.getPath(), i_Name);
+		
+		return this.getFile(i_Name);
+	}
+	
+	public Directory addDirectory(String i_Name) throws Throwable {
+		m_FileSystem.addDirectory(this.getPath(), i_Name);
+		
+		return this.getDirectory(i_Name);
+	}
+	
 	public AItem getItem(String i_Name) throws Throwable {
-		return m_Children.get(i_Name);
+		AItem item = null;
+		
+		if (!m_Children.containsKey(i_Name)) {
+			item = this.readItem(i_Name);
+		} else {
+			item = m_Children.get(i_Name);
+		}
+		
+		return item;
 	}
 	
 	public boolean containsItem(String i_Name) throws Throwable {
@@ -123,10 +145,6 @@ public class Directory extends AItem {
 		}
 		
 		return null;
-	}
-		
-	void updateSize(long i_NewSize, long i_TimeStamp) {
-//		addToHistory(null);
 	}
 	
 	DirectoryUniqueProperties getUniqueProperties() {

@@ -1,15 +1,19 @@
 package fairy.core;
 
+import java.io.IOException;
 import java.io.InputStream;
 import java.security.DigestInputStream;
 import java.security.MessageDigest;
 import java.security.NoSuchAlgorithmException;
 
 class Utils {
-	@SuppressWarnings("resource")
-	static byte[] getCheckSum(InputStream i_InputStream) throws NoSuchAlgorithmException {
+	static byte[] getCheckSum(InputStream i_InputStream) throws NoSuchAlgorithmException, IOException {
 		MessageDigest checkSum = MessageDigest.getInstance("MD5");
-		new DigestInputStream(i_InputStream, checkSum);
+		
+		try (DigestInputStream digestInputStream = new DigestInputStream(i_InputStream, checkSum)) {
+		} finally {
+		}
+		
 		return checkSum.digest();
 	}
 }
