@@ -16,8 +16,7 @@ public abstract class AItem {
 	public final boolean isFile;
 	public final boolean isDirectory;
 
-	protected AItem(String i_Name, Directory i_Parent, AFileSystem i_FileSystem, boolean i_IsFile,
-			boolean i_IsDirectory) {
+	protected AItem(String i_Name, Directory i_Parent, AFileSystem i_FileSystem, boolean i_IsFile, boolean i_IsDirectory) {
 		m_FileSystem = i_FileSystem;
 		Path path = Directory.getSubItemPath(i_Parent, i_Name);
 		long creationTime = m_FileSystem.getCreationTime(path);

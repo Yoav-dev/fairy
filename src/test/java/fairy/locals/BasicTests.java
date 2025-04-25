@@ -2,7 +2,6 @@ package fairy.locals;
 
 import java.io.IOException;
 import java.nio.file.Path;
-import java.time.Duration;
 
 import org.testng.annotations.Test;
 
@@ -51,9 +50,6 @@ public class BasicTests {
 			Directory sandbox = y.getDirectory("sandbox");
 			sandbox.addDirectory("NF1").addDirectory("NF1.1");
 			sandbox.addDirectory("NF2").addDirectory("NF2.1");
-			
-//			localFileSystem.getItemsMonitor().markItemForAction(new1);
-//			localFileSystem.getItemsMonitor().markItemForAction(new2);
 			Thread.sleep(Long.MAX_VALUE);
 		} catch (IOException e) {
 			e.printStackTrace();
