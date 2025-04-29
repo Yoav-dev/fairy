@@ -10,6 +10,7 @@ import java.nio.file.WatchService;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.Collection;
+import java.util.Collections;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
@@ -24,18 +25,16 @@ public abstract class AItemsMonitor {
 	// Whatch service gives watch key for every event, each key for a path
 	private Map<WatchKey, Directory> m_WatchKeys2Paths = new HashMap<WatchKey, Directory>();
 	
-	private TreeMap<ItemUniqueProperties, AItem> m_ItemsMarkedForAction = new TreeMap<ItemUniqueProperties, AItem>();
+	// Item actioners do some actions upon each action detected during monitoring:
+	// create, delete, modify
+	// Each class that extends abstract AItemActioner does another action, that can
+	// be any action
+	private TreeMap<ItemUniqueProperties, Collection<AItemActioner>> m_ItemsMarkedForAction = new TreeMap<ItemUniqueProperties, Collection<AItemActioner>>();
 	
 	private AFileSystem m_FileSystem;
 	
 	// Extract name of monitored item from WatchEvent context
 	protected abstract String extractName(Object i_Context) throws Throwable;
-
-	// Item actioners do some actions upon each action detected during monitoring:
-	// create, delete, modify
-	// Each class that extends abstract AItemActioner does another action, that can
-	// be any action
-	private Collection<AItemActioner> m_ItemActioners = new ArrayList<AItemActioner>();
 		
 	protected AItemsMonitor(WatchService i_WatchService) {
 		m_WatchService = i_WatchService;
@@ -58,7 +57,7 @@ public abstract class AItemsMonitor {
 	}
 	
 	public void markItemForAction(AItem i_Item) throws IOException {
-		m_ItemsMarkedForAction.putIfAbsent(i_Item.getUniqueProperties(), i_Item);
+		m_ItemsMarkedForAction.putIfAbsent(i_Item.getUniqueProperties(), new ArrayList<AItemActioner>());
 		
 		if (i_Item.isDirectory) {
 			Collection<AItem> children = ((Directory)i_Item).getChildren();
@@ -72,8 +71,22 @@ public abstract class AItemsMonitor {
 	}
 	//*
 	
-	public void addItemActioners(AItemActioner ... i_ItemActioners) {
-		m_ItemActioners.addAll(Arrays.asList(i_ItemActioners));
+	public void addItemActioners(AItem i_Item, AItemActioner ... i_ItemActioners) {
+		m_ItemsMarkedForAction.putIfAbsent(i_Item.getUniqueProperties(), new ArrayList<AItemActioner>());
+		m_ItemsMarkedForAction.get(i_Item.getUniqueProperties()).addAll(Arrays.asList(i_ItemActioners));
+	}
+	
+	public void addItemActioners(AItem i_Item, Collection<AItemActioner> i_ItemActioners) {
+		m_ItemsMarkedForAction.putIfAbsent(i_Item.getUniqueProperties(), new ArrayList<AItemActioner>());
+		m_ItemsMarkedForAction.get(i_Item.getUniqueProperties()).addAll(i_ItemActioners);
+	}
+	
+	private Collection<AItemActioner> getItemActioners(AItem i_Item) {
+		if (!m_ItemsMarkedForAction.containsKey(i_Item.getUniqueProperties())) {
+			return Collections.emptyList();
+		}
+		
+		return m_ItemsMarkedForAction.get(i_Item.getUniqueProperties());
 	}
 	
 	private void traverseEvents(TreeMap<ItemUniqueProperties, ItemProperties> o_AffectedPoperties, TreeSet<ItemUniqueProperties> o_ItemsToDelete) throws Throwable {
@@ -125,7 +138,9 @@ public abstract class AItemsMonitor {
 			}
 	}
 	
-	public void startMonitor() {		
+	public void startMonitor() {
+		AItemsMonitor self = this;
+		
 		Thread monitorThread = new Thread(new Runnable() {
 			@Override
 			public void run() {
@@ -144,20 +159,21 @@ public abstract class AItemsMonitor {
 							AItem item = m_FileSystem.getItem(itemUniqueProperties);
 							item.addToHistory(itemsProperties);
 							Directory parent = itemsProperties.getParent();
+							Collection<AItemActioner> parentItemActioners = self.getItemActioners(parent);
 							
-							if (m_ItemsMarkedForAction.containsKey(parent.getUniqueProperties())) {
+							if (!parentItemActioners.isEmpty()) {
 								if (itemsProperties.getAffectType() == EPropertiesAffectType.eCreate) {
-										m_ItemsMarkedForAction.put(item.getUniqueProperties(), item);
+										self.addItemActioners(item, parentItemActioners);
 										
-										for (AItemActioner itemActioner : m_ItemActioners) {
+										for (AItemActioner itemActioner : parentItemActioners) {
 											itemActioner.created(item, itemsProperties.getTimestamp());
 										}
 								} else if (itemsProperties.getAffectType() == EPropertiesAffectType.eModify) {
-										for (AItemActioner itemActioner : m_ItemActioners) {
+										for (AItemActioner itemActioner : parentItemActioners) {
 											itemActioner.modified(item, itemsProperties.getSize(), timestamp);
 										}
 								} else if (itemsProperties.getAffectType() == EPropertiesAffectType.eRename) {
-										for (AItemActioner itemActioner : m_ItemActioners) {
+										for (AItemActioner itemActioner : parentItemActioners) {
 											itemActioner.renamed(item, item.getPath(), itemsProperties.getPath(), timestamp);
 										}
 								}
@@ -171,9 +187,10 @@ public abstract class AItemsMonitor {
 						for (ItemUniqueProperties itemUniqueProperties : itemsToDelete) {
 							AItem itemToDelete = m_FileSystem.getItem(itemUniqueProperties);
 							Directory parent = itemToDelete.getParent();
+							Collection<AItemActioner> parentItemActioners = self.getItemActioners(parent);
 							
 							if (m_ItemsMarkedForAction.containsKey(parent.getUniqueProperties())) {
-								for (AItemActioner itemActioner : m_ItemActioners) {
+								for (AItemActioner itemActioner : parentItemActioners) {
 									itemActioner.deleted(itemToDelete, timestamp);
 								}
 							}

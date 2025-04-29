@@ -14,7 +14,15 @@ public class BasicTests {
   void test() throws Throwable {
 		try {
 			LocalFileSystem localFileSystem = LocalFileSystem.getLocalFileSystem();
-			localFileSystem.getItemsMonitor().addItemActioners(new AItemActioner[] {new AItemActioner() {
+			
+			Directory root = localFileSystem.getDirectory("/");
+			Directory y = root
+					.getDirectory("run")
+					.getDirectory("media")
+					.getDirectory("yoav")
+					.getDirectory("3C9550D109262BB2")
+					.getDirectory("y");
+			localFileSystem.getItemsMonitor().addItemActioners(y, new AItemActioner[] {new AItemActioner() {
 				
 				@Override
 				protected void renamed(AItem i_Item, Path i_OldPath, Path i_NewPath, long i_RenameTime) {
@@ -38,16 +46,32 @@ public class BasicTests {
 					
 				}
 			}});
-			Directory root = localFileSystem.getDirectory("/");
-			Directory y = root
-					.getDirectory("run")
-					.getDirectory("media")
-					.getDirectory("yoav")
-					.getDirectory("3C9550D109262BB2")
-					.getDirectory("y");
-			localFileSystem.getItemsMonitor().markItemForAction(y);
 			y.getPath().resolve("sandbox").toFile().mkdir();
 			Directory sandbox = y.getDirectory("sandbox");
+			localFileSystem.getItemsMonitor().addItemActioners(sandbox, new AItemActioner[] {new AItemActioner() {
+				
+				@Override
+				protected void renamed(AItem i_Item, Path i_OldPath, Path i_NewPath, long i_RenameTime) {
+					System.out.println("sb " + i_OldPath.toString() + " renamed to " + i_NewPath);
+				}
+				
+				@Override
+				protected void modified(AItem i_Item, long i_NewSize, long i_ModificationTime) {
+					System.out.println("sb " +i_Item.getPath().toString() + " modified");
+				}
+				
+				@Override
+				protected void deleted(AItem i_Item, long i_DeletionTime) {
+					System.out.println("sb " +i_Item.getPath().toString() + " deleted");
+					
+				}
+				
+				@Override
+				protected void created(AItem i_Item, long i_CreationTime) {
+					System.out.println("sb " +i_Item.getPath().toString() + " created");
+					
+				}
+			}});
 			sandbox.addDirectory("NF1").addDirectory("NF1.1");
 			sandbox.addDirectory("NF2").addDirectory("NF2.1");
 			Thread.sleep(Long.MAX_VALUE);
