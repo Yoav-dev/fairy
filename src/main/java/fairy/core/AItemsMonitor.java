@@ -72,13 +72,18 @@ public abstract class AItemsMonitor {
 	//*
 	
 	public void addItemActioners(AItem i_Item, AItemActioner ... i_ItemActioners) {
-		m_ItemsMarkedForAction.putIfAbsent(i_Item.getUniqueProperties(), new ArrayList<AItemActioner>());
-		m_ItemsMarkedForAction.get(i_Item.getUniqueProperties()).addAll(Arrays.asList(i_ItemActioners));
+		this.addItemActioners(i_Item, Arrays.asList(i_ItemActioners));
 	}
 	
 	public void addItemActioners(AItem i_Item, Collection<AItemActioner> i_ItemActioners) {
 		m_ItemsMarkedForAction.putIfAbsent(i_Item.getUniqueProperties(), new ArrayList<AItemActioner>());
 		m_ItemsMarkedForAction.get(i_Item.getUniqueProperties()).addAll(i_ItemActioners);
+		
+		if (i_Item.isDirectory) {
+			for (AItem item : ((Directory)i_Item).getChildren()) {
+				this.addItemActioners(item, i_ItemActioners);
+			}
+		}
 	}
 	
 	private Collection<AItemActioner> getItemActioners(AItem i_Item) {
